@@ -1,0 +1,15 @@
+# Compiled ARM benchmark binaries land here (regenerated on the VM by the
+# cross-compile script). Never commit build output.
+bin/
+
+# Build artifacts left inside benchmark source dirs by `make`.
+# (*.o and *.pyc are already ignored repo-wide by the root .gitignore.)
+*.a
+*.lo
+*.la
+*.so
+
+# Editor / OS cruft
+*.swp
+.DS_Store
+Thumbs.db

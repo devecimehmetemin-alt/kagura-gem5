@@ -1,0 +1,19 @@
+# MiBench is built and run on the Linux VM. Normalize all text to LF in the
+# repo and on checkout everywhere, so scripts, Makefiles, source, and text
+# inputs work on the VM regardless of each machine's core.autocrlf setting.
+# git auto-detects binary files (by NUL bytes) and leaves those untouched.
+* text=auto eol=lf
+
+# Audio/image inputs that must stay byte-exact. Marked binary explicitly as a
+# safeguard, so line-ending conversion can never corrupt them even if a file
+# happens to contain no NUL bytes in the region git samples.
+*.pcm   binary
+*.adpcm binary
+*.gsm   binary
+*.au    binary
+*.wav   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.bmp   binary
+*.mp3   binary

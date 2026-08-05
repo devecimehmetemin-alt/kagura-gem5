@@ -2,6 +2,14 @@ MODULE.bazel.lock
 bazel-*
 build
 gem5_build
+
+# Cross-compiled MiBench ARM binaries and run artifacts (built on the VM)
+workloads/bin/
+workloads/mibench/**/output_*.txt
+workloads/mibench/**/output*.dat
+workloads/mibench/**/*.smoothing.pgm
+workloads/mibench/**/*.edges.pgm
+workloads/mibench/**/*.corners.pgm
 parser.out
 parsetab.py
 cscope.files
