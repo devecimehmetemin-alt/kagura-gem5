@@ -1,0 +1,34 @@
+Import ('*')
+
+SimObject('IntermittentController.py', sim_objects=['IntermittentController']) #python cpp binding
+Source('intermittent_controller.cc') # adds new cpp objects to be built in gem5
+DebugFlag('IntermittentController') # will be used as a trace
+
+# MinorCPU variant that stays suspended across drain/resume (ARM build assumed).
+SimObject('IntermittentMinorCPU.py', sim_objects=['IntermittentMinorCPU'])
+Source('intermittent_minor_cpu.cc')
+
+# Compressor wrapper that prices compression in energy (and, from stage 4, is
+# where the decision to compress at all is made).
+SimObject('EnergyCompressor.py', sim_objects=['EnergyCompressor'])
+Source('energy_compressor.cc')
+
+# ACC (Alameldeen & Wood 2004): a Global Compression Predictor gates the
+# wrapped compressor; an ACCCache classifies hits to feed the predictor.
+SimObject('ACC.py', sim_objects=['ACC'])
+Source('acc.cc')
+DebugFlag('ACC')
+SimObject('ACCCache.py', sim_objects=['ACCCache'])
+Source('acc_cache.cc')
+
+# Kagura (stage 5): the controller estimates the memory operations left in
+# the power cycle and force-disables compression near the predicted failure.
+SimObject('KaguraController.py', sim_objects=['KaguraController'])
+Source('kagura_controller.cc')
+DebugFlag('Kagura')
+
+# MemCtrl that exposes its byte counters, so the power model can price the
+# main-memory traffic cache misses cause -- the largest energy term here, and
+# the one compression exists to reduce.
+SimObject('NvmMemCtrl.py', sim_objects=['NvmMemCtrl'])
+Source('nvm_mem_ctrl.cc')
