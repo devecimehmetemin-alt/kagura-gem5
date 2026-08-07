@@ -2329,6 +2329,34 @@ clock_getresFunc(SyscallDesc *desc, ThreadContext *tc, int clk_id,
     return 0;
 }
 
+/// Target clock_gettime64() function, for the time64 syscall family that
+/// 32-bit targets with 64-bit time_t use in place of clock_gettime().
+template <class OS>
+SyscallReturn
+clock_gettime64Func(SyscallDesc *desc, ThreadContext *tc,
+                    int clk_id, VPtr<typename OS::timespec64> tp)
+{
+    getElapsedTimeNano(tp->tv_sec, tp->tv_nsec);
+    tp->tv_sec += seconds_since_epoch;
+    tp->tv_sec = htog(tp->tv_sec, OS::byteOrder);
+    tp->tv_nsec = htog(tp->tv_nsec, OS::byteOrder);
+
+    return 0;
+}
+
+/// Target clock_getres_time64() function.
+template <class OS>
+SyscallReturn
+clock_getres64Func(SyscallDesc *desc, ThreadContext *tc, int clk_id,
+                   VPtr<typename OS::timespec64> tp)
+{
+    // Set resolution at ns, which is what clock_gettime64() returns
+    tp->tv_sec = 0;
+    tp->tv_nsec = 1;
+
+    return 0;
+}
+
 /// Target gettimeofday() handler.
 template <class OS>
 SyscallReturn

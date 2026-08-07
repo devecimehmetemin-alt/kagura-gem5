@@ -185,6 +185,14 @@ class ArmLinux32 : public ArmLinux, public OpenFlagTable<ArmLinux32>
         int32_t tv_nsec;  //!< nanoseconds
     };
 
+    /// For the time64 syscall family (e.g. clock_gettime64), which
+    /// 32-bit glibc uses when built with 64-bit time_t.
+    struct timespec64
+    {
+        int64_t tv_sec;   //!< seconds
+        int64_t tv_nsec;  //!< nanoseconds
+    };
+
     // For writev/readv
     struct tgt_iovec
     {

@@ -493,6 +493,10 @@ class SyscallTable32 : public SyscallDescTable<EmuLinux::SyscallABI32>
               {base + 384, "getrandom", getrandomFunc<ArmLinux32>},
               {base + 397, "sys_statx", ignoreFunc},
               {base + 398, "sys_rseq", ignoreFunc},
+              {base + 403, "clock_gettime64",
+                  clock_gettime64Func<ArmLinux32>},
+              {base + 406, "clock_getres_time64",
+                  clock_getres64Func<ArmLinux32>},
               {base + 435, "clone3", clone3Func<ArmLinux32>},
           })
     {}
