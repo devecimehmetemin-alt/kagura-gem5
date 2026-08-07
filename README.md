@@ -597,9 +597,43 @@ not record them.
 
 ## Deviations from the paper
 
+The first thing to check against any number this model produces.
+
+**ISA.** The paper compiles for ARMv7-M. gem5 has no M-profile model, so (as
+the paper also does) Thumb-2 code runs on the A-profile model, in syscall
+emulation rather than bare metal. One leftover impurity: the toolchain's
+static glibc objects are plain-ARM ARMv5.
+
+**Checkpoint semantics.** NVSRAMCache halts at V_ckpt and squashes uncommitted
+in-flight instructions; they re-execute after restore. gem5 cannot squash
+in-flight work from outside the CPU, so this drains instead, completing the
+in-flight work. Both end on a precise commit boundary. They differ by a few
+instructions of position, and the drained LSQ takes the role of the
+checkpointed store buffer.
+
+**Predictor scope.** One GCP per cache instead of one global counter, because
+gem5 binds a compressor to a single cache.
+
+**ReRAM model.** Table I's parameter names (`tCK`/`tBURST`/`tRCD`/`tCL`/`tWTR`/
+`tWR`/`tXAW`) are gem5 `DRAMInterface` parameters, and `NVMInterface` has none
+of them. So the paper modeled ReRAM as a DRAM interface with slowed timings,
+and this does the same. Unspecified timings inherit `DDR3_1600_8x8`, and
+refresh is pushed out of reach with a very long `tREFI`.
+
 **ReRAM write energy.** Table I gives SRAM access energy and BDI
 compress/decompress energy, but no per-byte ReRAM write energy; the paper
 derives its figures from McPAT/CACTI at 45 nm. The value used here is a
 placeholder. Every checkpoint-energy number is linear in it, so it is swept
 rather than fixed, and no single run of it should be read as an absolute
 figure.
+
+**Sampling.** `sample_interval` is not part of the published ACC, and it is
+not optional here. The paper's ACC compresses on every allocation and only
+decides whether to *store* the result, so its predictor is always fed. This
+study cannot do that: the skipped compressions are the energy saving being
+measured, and a fill that is really skipped is stored full size, never
+co-allocates, and can never earn a reward. Regular Mode would be permanent.
+Compressing once every `sample_interval` gated fills keeps the evidence
+flowing at 1/64 of the cost. Kagura's override suppresses these samples too,
+so `mSAMP.sh` sweeps the interval to measure how much of any Kagura margin
+they account for.
