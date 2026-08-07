@@ -24,28 +24,45 @@ This is a fork, so gem5's own README is kept unchanged at
 ## The object graph
 
 Seven SimObjects, connected by the config scripts in `configs/kagura/`. The
-main path is a straight line from the CPU down to memory. The controller sits
-on the side and reads from everything:
+main path runs from the CPU down to memory. The controller sits on the side
+and reads from everything:
 
 ```
-    IntermittentMinorCPU          (MinorCPU subclass)
-             |
-             v
-    IntermittentController        (the capacitor)
-      KaguraController            (subclass: adds the registers)
-             |
-             v
-    ACC                           (one per cache, holds the GCP)
-      EnergyCompressor            (its base: prices compression)
-             |
-             v
-    ACCCache                      (icache, dcache)
-             |
-             v
-    NvmMemCtrl                    (main memory)
+                    ┌──────────────────────────┐
+                    │  IntermittentMinorCPU    │
+                    │  (MinorCPU subclass)     │
+                    └────┬──────────────┬──────┘
+           totalInsts()  │              │  RetiredLoads / RetiredStores
+                         │              │  (gem5 probe points)
+                         ▼              ▼
+   ┌──────────────────────────────────────────────────┐
+   │  IntermittentController      the capacitor       │
+   │    updateCapacitor() every 1 us                  │
+   │    suspendContext() / activateContext()          │
+   │  KaguraController (its subclass)                 │
+   │    adds R_mem, R_prev, R_thres, R_evict          │
+   └──▲─────────▲────────────────▲──────┬─────────────┘
+      │ tags    │ blockEvicted() │      │ broadcastMode()
+      │ (dirty  │                │      │ -> setRegularMode()
+      │  walk)  │    getEnergy() │      ▼
+      │         │                │   ┌────────────────────────┐
+      │         │                └───┤  ACC  (one per cache)  │
+      │         │                    │  EnergyCompressor      │
+      │         │                    │  subclass; holds GCP   │
+      │         │                    └───▲─────────┬──────────┘
+   ┌──┴─────────┴───┐                    │ reward  │ compress()
+   │  ACCCache      │                    │ penalize│ / passThrough()
+   │  icache        ├────────────────────┘         │
+   │  dcache        ├──────────────────────────────┘
+   └────────┬───────┘
+            │
+            ▼
+   ┌────────────────┐   bytesRead() / bytesWritten()
+   │  NvmMemCtrl    ├─────────────────► IntermittentController
+   └────────────────┘
 ```
 
-The boxes are simple. What matters is what passes between them:
+The same edges, row by row:
 
 | From | To | What crosses |
 |---|---|---|
