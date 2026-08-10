@@ -25,16 +25,21 @@ TERMS = [
     ("compressionEnergy", "Compression"),
 ]
 
-WANT = [
-    "system.cpu.numCycles",
-    "simInsts",
-    "simTicks",
-    "root.intermittent.numPowerFailures",
-    "root.intermittent.ticksPoweredOff",
-    "root.intermittent.budgetEnergy",
-    "root.intermittent.checkpointBytes",
-    "root.intermittent.checkpointDirtyBytes",
-] + ["root.intermittent." + k for k, _ in TERMS]
+# Controller stats. The prefix depends on where the controller was parented,
+# so match on the trailing name instead of hardcoding "root.intermittent.".
+CTRL = [
+    "numPowerFailures",
+    "ticksPoweredOff",
+    "budgetEnergy",
+    "checkpointBytes",
+    "checkpointDirtyBytes",
+    "nvmReadBytes",
+    "nvmWriteBytes",
+    "nvmEnergyOffPeriod",
+] + [k for k, _ in TERMS]
+
+# Global stats, which carry no prefix.
+GLOBAL = ["simInsts", "simTicks"]
 
 
 def read_stats(path):
@@ -48,9 +53,18 @@ def read_stats(path):
             if len(parts) < 2:
                 continue
             name, value = parts[0], parts[1]
-            if name in WANT:
+
+            key = None
+            if name in GLOBAL:
+                key = name
+            elif "intermittent" in name:
+                tail = name.rsplit(".", 1)[-1]
+                if tail in CTRL:
+                    key = tail
+
+            if key is not None:
                 try:
-                    out[name] = float(value)
+                    out[key] = float(value)
                 except ValueError:
                     pass
     return out
@@ -71,7 +85,7 @@ def report(path):
         print("%s: no stats found" % path)
         return
 
-    total = s.get("root.intermittent.budgetEnergy", 0.0)
+    total = s.get("budgetEnergy", 0.0)
     if total <= 0:
         print("%s: budgetEnergy is zero -- was this run built after the "
               "energy-breakdown stats were added?" % path)
@@ -81,7 +95,7 @@ def report(path):
     print(path)
     print("=" * 68)
 
-    failures = s.get("root.intermittent.numPowerFailures", 0.0)
+    failures = s.get("numPowerFailures", 0.0)
     insts = s.get("simInsts", 0.0)
     if failures > 0:
         print("Power failures      %d" % failures)
@@ -95,27 +109,45 @@ def report(path):
 
     print("%-42s %12s %8s" % ("Term", "Energy", "Share"))
     print("-" * 68)
-    rows = [(s.get("root.intermittent." + k, 0.0), label)
-            for k, label in TERMS]
+    rows = [(s.get(k, 0.0), label) for k, label in TERMS]
     for value, label in sorted(rows, reverse=True):
-        print("%-42s %12s %7.2f%%"
+        print("%-42s %12s %7.3f%%"
               % (label, si(value), 100.0 * value / total))
     print("-" * 68)
-    print("%-42s %12s %7.2f%%" % ("Total", si(total), 100.0))
+    print("%-42s %12s %7.3f%%" % ("Total", si(total), 100.0))
     print()
 
-    # The two numbers the ceiling argument rests on.
-    comp = s.get("root.intermittent.compressionEnergy", 0.0) / total
-    nvm = s.get("root.intermittent.nvmEnergy", 0.0) / total
-    ckpt = s.get("root.intermittent.checkpointEnergy", 0.0) / total
+    # The numbers the ceiling argument rests on.
+    comp = s.get("compressionEnergy", 0.0) / total
+    nvm = s.get("nvmEnergy", 0.0) / total
+    ckpt = s.get("checkpointEnergy", 0.0) / total
     print("Ceilings")
-    print("  Scheduling compression better (Kagura)  <= %.2f%%"
+    print("  Scheduling compression better (Kagura)  <= %.3f%%"
           % (100.0 * comp))
-    print("  Compression at zero cost, all misses    <= %.2f%%"
+    print("  Compression at zero cost, all misses    <= %.3f%%"
           % (100.0 * nvm))
-    print("  Anything acting on the checkpoint       <= %.2f%%"
+    print("  Anything acting on the checkpoint       <= %.3f%%"
           % (100.0 * ckpt))
     print()
+
+    # Stages 2-5 build a plain MemCtrl and never pass nvm= to the controller,
+    # so the traffic term is structurally absent rather than measured as zero.
+    # Without it the denominator is too small and every share above is an
+    # overestimate. Only stage_six_sweep.py wires NvmMemCtrl.
+    if s.get("nvmReadBytes", 0.0) == 0 and s.get("nvmWriteBytes", 0.0) == 0:
+        print("WARNING: no NVM traffic recorded. This config did not connect")
+        print("         a NvmMemCtrl to the controller, so main-memory energy")
+        print("         is missing from the budget entirely. Re-run with")
+        print("         configs/kagura/stage_six_sweep.py for a complete one.")
+        print()
+
+    off = s.get("nvmEnergyOffPeriod", 0.0)
+    if off > 0:
+        print("Note: %s of NVM energy was counted while the core was dark and"
+              % si(off))
+        print("      never actually drained the capacitor (%.2f%% of total)."
+              % (100.0 * off / total))
+        print()
 
 
 def main():
