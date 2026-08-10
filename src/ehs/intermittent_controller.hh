@@ -127,6 +127,8 @@ class EnergyCompressor;
                 statistics::Scalar checkpointTicks;
                 statistics::Scalar ckptStallTicks;
                 statistics::Scalar compressionEnergy;
+                statistics::Scalar staticEnergy;
+                statistics::Scalar dynamicEnergy;
 
                 // NVM traffic
                 statistics::Scalar nvmReadBytes;
@@ -144,6 +146,16 @@ class EnergyCompressor;
                 statistics::Scalar ckptProbeZeroBlocks;
                 statistics::Scalar ckptProbeGe2x;
                 statistics::Scalar ckptProbeGe4x;
+
+                // Where the energy went. Every term the capacitor pays for,
+                // and each one's share, so the ceiling on any policy that
+                // only touches one term can be read off directly.
+                statistics::Formula budgetEnergy;
+                statistics::Formula staticEnergyFrac;
+                statistics::Formula dynamicEnergyFrac;
+                statistics::Formula compressionEnergyFrac;
+                statistics::Formula nvmEnergyFrac;
+                statistics::Formula checkpointEnergyFrac;
             } stats;
 
             void updateCapacitor();

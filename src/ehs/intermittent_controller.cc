@@ -260,6 +260,12 @@ namespace gem5
         double p_comp = (dt > 0) ? (compressionDelta / dt) : 0.0;
         double p_nvm = (dt > 0) ? (nvmDelta / dt) : 0.0;
 
+        // Same two terms as energies, so the budget can be broken down by
+        // where it went. Only accrued while powered, which is why they sit
+        // after the guard.
+        stats.staticEnergy += staticPower * dt;
+        stats.dynamicEnergy += delta * energyPerInst;
+
         return staticPower + p_dyn + p_comp + p_nvm;
     }
 
@@ -437,6 +443,14 @@ namespace gem5
                  "to checkpointTicks is what the model forgives"),
         ADD_STAT(compressionEnergy, statistics::units::Joule::get(),
                  "Total energy the compressors drew from the capacitor"),
+        ADD_STAT(staticEnergy, statistics::units::Joule::get(),
+                 "Leakage energy: p_static integrated over the time the core "
+                 "was powered. Lumped for the whole system, so the cache's "
+                 "own share of it is not separable"),
+        ADD_STAT(dynamicEnergy, statistics::units::Joule::get(),
+                 "Switching energy: committed instructions x e_per_inst. "
+                 "Also lumped -- covers the core, the register file and the "
+                 "SRAM accesses together"),
         ADD_STAT(nvmReadBytes, statistics::units::Byte::get(),
                  "Bytes read from NVM on cache fills"),
         ADD_STAT(nvmWriteBytes, statistics::units::Byte::get(),
@@ -473,18 +487,55 @@ namespace gem5
         ADD_STAT(ckptProbeGe2x, statistics::units::Count::get(),
                  "Probed blocks that compressed to half the line or better"),
         ADD_STAT(ckptProbeGe4x, statistics::units::Count::get(),
-                 "Probed blocks that compressed to a quarter or better")
+                 "Probed blocks that compressed to a quarter or better"),
+        ADD_STAT(budgetEnergy, statistics::units::Joule::get(),
+                 "Every energy term the capacitor pays for, added up: "
+                 "leakage + switching + compression + NVM traffic + "
+                 "checkpoints"),
+        ADD_STAT(staticEnergyFrac, statistics::units::Ratio::get(),
+                 "Leakage as a share of the budget"),
+        ADD_STAT(dynamicEnergyFrac, statistics::units::Ratio::get(),
+                 "Switching as a share of the budget"),
+        ADD_STAT(compressionEnergyFrac, statistics::units::Ratio::get(),
+                 "Compression as a share of the budget. This is the ceiling "
+                 "on any policy that only schedules compression: even a "
+                 "perfect one that never compressed a wasted block could not "
+                 "save more than this"),
+        ADD_STAT(nvmEnergyFrac, statistics::units::Ratio::get(),
+                 "Main-memory traffic as a share of the budget. This is what "
+                 "compression can attack indirectly by avoiding misses, and "
+                 "the ceiling on zero-cost compression"),
+        ADD_STAT(checkpointEnergyFrac, statistics::units::Ratio::get(),
+                 "Checkpoints as a share of the budget")
     {
         // Checkpoints cost sub-uJ; the default six-decimal stat formatting
         // would print every total as 0.000000 J.
         checkpointEnergy.precision(12);
         compressionEnergy.precision(12);
+        staticEnergy.precision(12);
+        dynamicEnergy.precision(12);
         nvmReadEnergy.precision(12);
         nvmWriteEnergy.precision(12);
         nvmEnergy.precision(12);
         nvmEnergyOffPeriod.precision(12);
+        budgetEnergy.precision(12);
 
         nvmEnergy = nvmReadEnergy + nvmWriteEnergy;
+
+        budgetEnergy = staticEnergy + dynamicEnergy + compressionEnergy +
+                       nvmReadEnergy + nvmWriteEnergy + checkpointEnergy;
+
+        staticEnergyFrac = staticEnergy / budgetEnergy;
+        dynamicEnergyFrac = dynamicEnergy / budgetEnergy;
+        compressionEnergyFrac = compressionEnergy / budgetEnergy;
+        nvmEnergyFrac = (nvmReadEnergy + nvmWriteEnergy) / budgetEnergy;
+        checkpointEnergyFrac = checkpointEnergy / budgetEnergy;
+
+        staticEnergyFrac.precision(6);
+        dynamicEnergyFrac.precision(6);
+        compressionEnergyFrac.precision(6);
+        nvmEnergyFrac.precision(6);
+        checkpointEnergyFrac.precision(6);
     }
 
 } // namespace gem5
