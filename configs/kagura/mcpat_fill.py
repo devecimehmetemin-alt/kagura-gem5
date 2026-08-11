@@ -103,7 +103,18 @@ def build(s):
         "context_switches": 0.0,
     }
 
+    # The top-level system block carries its own cycle counts, and McPAT
+    # divides total energy by those to get average power. Leave them at the
+    # template's value and every dynamic number is wrong by the ratio of
+    # the two -- which is how a 13 W figure appeared for a 200 MHz core.
+    system = {
+        "total_cycles": cycles,
+        "idle_cycles": 0.0,
+        "busy_cycles": cycles,
+    }
+
     return {
+        "system": system,
         "system.core0": core,
         "system.core0.icache": {
             "read_accesses": icache_acc,
