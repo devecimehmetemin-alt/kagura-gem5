@@ -197,6 +197,24 @@ def report(path):
           % (100.0 * ckpt / total))
     print()
 
+    # Leakage is the one input with nothing published to check it against,
+    # so quote the bound that survives setting it to zero. Any positive
+    # leakage only makes these shares smaller, which makes this the ceiling
+    # no assumption about p_static can raise.
+    work = total - static
+    if work > 0:
+        print("Leakage-independent bounds (p_static set to zero)")
+        print("  Work energy, excluding leakage           %s" % si(work))
+        print("  Compression                             <= %.3f%%"
+              % (100.0 * comp / work))
+        print("  Miss traffic                            <= %.3f%%"
+              % (100.0 * (nvm_read + nvm_write) / work))
+        print("  Checkpoints                             <= %.3f%%"
+              % (100.0 * ckpt / work))
+        print("  Every input above is Table I or measured; no placeholder")
+        print("  for leakage enters these numbers.")
+        print()
+
     # Stages 2-5 build a plain MemCtrl and never pass nvm= to the controller,
     # so the traffic term is structurally absent rather than measured as zero.
     if s.get("nvmReadBytes", 0.0) == 0 and s.get("nvmWriteBytes", 0.0) == 0:
