@@ -57,6 +57,13 @@ CORE = {
     "RAS_size": "0",
 
     "number_hardware_threads": "1",
+
+    # Function units. The A9 template gives three integer ALUs, which on a
+    # single-issue in-order core is two more than can ever be busy and cost
+    # 0.078 mm2 of the 0.81 mm2 total. One integer ALU, one multiplier (a
+    # Cortex-M3 has a single-cycle multiply), no FPU.
+    "ALU_per_core": "1",
+    "MUL_per_core": "1",
     "FPU_per_core": "0",
     "fp_issue_width": "0",
 }
