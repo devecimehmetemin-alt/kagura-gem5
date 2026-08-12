@@ -29,9 +29,29 @@
 
 set -u
 
-CROSS_GCC="arm-linux-gnueabi-gcc"
-CROSS_STRIP="arm-linux-gnueabi-strip"
-CROSS_FLAGS="-static -march=armv7-a -mthumb"
+# LIBC=glibc (default) or LIBC=musl. Static glibc is the reason a MiBench
+# kernel links to ~485 KB of text, which at a 1 KB I-cache is most of the
+# miss traffic and so most of the energy. musl statically links to a few tens
+# of KB and still issues Linux syscalls, so gem5's SE mode needs no change.
+# Install a musl cross toolchain (not in apt) with:
+#     curl -LO https://musl.cc/arm-linux-musleabi-cross.tgz
+#     sudo tar -xf arm-linux-musleabi-cross.tgz -C /opt
+#     export PATH=/opt/arm-linux-musleabi-cross/bin:$PATH
+LIBC="${LIBC:-glibc}"
+
+if [ "$LIBC" = "musl" ]; then
+    CROSS_GCC="arm-linux-musleabi-gcc"
+    CROSS_STRIP="arm-linux-musleabi-strip"
+else
+    CROSS_GCC="arm-linux-gnueabi-gcc"
+    CROSS_STRIP="arm-linux-gnueabi-strip"
+fi
+
+# -Os and section GC because the target is a 256 B to 4 kB I-cache: code size
+# is the dominant energy term here, not instruction count. --gc-sections drops
+# every function the link does not reach, which is most of what a static libc
+# pulls in.
+CROSS_FLAGS="-static -march=armv7-a -mthumb -Os -ffunction-sections -fdata-sections -Wl,--gc-sections"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIBENCH="$SCRIPT_DIR/mibench"
@@ -143,5 +163,14 @@ done
 
 echo "----------------------------------------------------------------------"
 echo "Done. Benchmarks with at least one ARM binary: $ok   failed: $fail"
+echo "libc:         $LIBC"
 echo "ARM binaries: $BIN_DIR"
 echo "Build logs:   $LOG_DIR"
+echo
+echo "Text size per binary (this is what has to fit in the I-cache):"
+for f in "$BIN_DIR"/*; do
+    [ -f "$f" ] || continue
+    printf "  %-20s %8s B\n" "$(basename "$f")" \
+        "$("$CROSS_STRIP" --version >/dev/null 2>&1 && \
+           ${CROSS_GCC%-gcc}-size "$f" 2>/dev/null | awk 'NR==2 {print $1}')"
+done

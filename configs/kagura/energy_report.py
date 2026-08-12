@@ -119,7 +119,20 @@ def row(label, value, total, indent=0):
           % (" " * indent + label, si(value), 100.0 * value / total))
 
 
-def report(path, e_access):
+def powered_seconds(s):
+    """Wall seconds the core was actually on.
+
+    The controller stats give ticksPoweredOff, and simTicks/simSeconds fix
+    the tick rate, so this needs nothing from the CPU model.
+    """
+    ticks = s.get("simTicks", 0.0)
+    secs = s.get("simSeconds", 0.0)
+    if ticks <= 0 or secs <= 0:
+        return 0.0
+    return secs * max(0.0, ticks - s.get("ticksPoweredOff", 0.0)) / ticks
+
+
+def report(path, e_access, clock_mhz):
     s = read_stats(path)
     if not s:
         print("%s: no stats found" % path)
@@ -149,10 +162,25 @@ def report(path, e_access):
     print("Total energy        %s" % si(total))
     print("SRAM access energy  %s" % ", ".join(
         "%s %.1f pJ" % (c, e_access[c] * 1e12) for c in CACHES))
-    if s.get("simInsts") and s.get("system.cpu.numCycles"):
-        cycles = s["system.cpu.numCycles"]
-        print("CPI                 %.2f  (%.1f pJ per cycle)"
-              % (cycles / s["simInsts"], 1e12 * total / cycles))
+
+    # Cycles are counted from powered time, not system.cpu.numCycles. That
+    # counter is only trustworthy on MinorCPU: TimingSimpleCPU picks up the
+    # dark periods across a sleep/wake transition, which at a 0.01% duty
+    # cycle inflates it by four orders of magnitude. Powered time is
+    # measured the same way by both.
+    on_secs = powered_seconds(s)
+    if on_secs > 0:
+        cycles = on_secs * clock_mhz * 1e6
+        print("Powered time        %.6f s of %.3f s wall (%.3f%% duty)"
+              % (on_secs, s.get("simSeconds", 0.0),
+                 100.0 * on_secs / s["simSeconds"] if s.get("simSeconds")
+                 else 0.0))
+        print("Average power on    %.2f mW   (paper regime: 160 uW/MHz "
+              "= %.1f mW at %g MHz)"
+              % (1e3 * total / on_secs, 0.160 * clock_mhz, clock_mhz))
+        if s.get("simInsts"):
+            print("CPI                 %.2f  (%.1f pJ per cycle, against "
+                  "160 pJ)" % (cycles / s["simInsts"], 1e12 * total / cycles))
     print()
 
     # Carve the L1 access energy out of the lumped dynamic term. Priced per
@@ -268,6 +296,9 @@ def main():
     ap.add_argument("--e-dcache-access", type=float, default=None,
                     help="Per-access energy for the D-cache, J. Defaults to "
                     "--e-sram-access.")
+    ap.add_argument("--clock-mhz", type=float, default=200.0,
+                    help="Core clock in MHz (default: 200, Table I). Used "
+                    "only to turn powered time into cycles.")
     args = ap.parse_args()
 
     e_access = {
@@ -282,7 +313,7 @@ def main():
             print("not found: %s" % p)
     for p in args.paths:
         if os.path.isfile(p):
-            report(p, e_access)
+            report(p, e_access, args.clock_mhz)
 
 
 if __name__ == "__main__":
