@@ -19,15 +19,23 @@ What cannot be split without a per-structure power model: leakage (one
 lumped p_static for the whole system, so the cache's share of it is not
 recoverable) and core logic by pipeline stage.
 
+Per-access energy is a knob because it is not a constant of the design: a
+bigger array costs more per access, so a cache-size sweep that holds it at
+Table I's 9 pJ reports only the change in access counts and misses the
+tradeoff entirely. Run CACTI at each geometry and pass the numbers in.
+
 Usage:
     python configs/kagura/energy_report.py m5out/stats.txt
     python configs/kagura/energy_report.py sweep/*/stats.txt
+    python configs/kagura/energy_report.py --e-icache-access 85e-12 \\
+        --e-dcache-access 33e-12 m5out/stats.txt
 """
-import sys
+import argparse
 import os
 
 
-# Table I: SRAM access energy. The only core-side energy the paper gives.
+# Table I: SRAM access energy. The only core-side energy the paper gives, and
+# the default for both caches so a bare run reproduces earlier results.
 E_SRAM_ACCESS = 9e-12
 
 CACHE_LINE = 32
@@ -52,8 +60,10 @@ CTRL = [
     "nvmEnergyOffPeriod",
 ]
 
-# Global stats, which carry no prefix.
-GLOBAL = ["simInsts", "simTicks", "simSeconds"]
+# Global stats, matched on their full name. numCycles is here for the energy
+# per cycle: the paper's baseline prices the core at a flat 160 uW/MHz, which
+# is 160 pJ per cycle whatever the clock, so that is the figure to compare.
+GLOBAL = ["simInsts", "simTicks", "simSeconds", "system.cpu.numCycles"]
 
 # Cache stats, matched on the full name.
 CACHES = ["icache", "dcache"]
@@ -109,7 +119,7 @@ def row(label, value, total, indent=0):
           % (" " * indent + label, si(value), 100.0 * value / total))
 
 
-def report(path):
+def report(path, e_access):
     s = read_stats(path)
     if not s:
         print("%s: no stats found" % path)
@@ -137,11 +147,20 @@ def report(path):
     if s.get("simSeconds"):
         print("Simulated time      %.6f s" % s["simSeconds"])
     print("Total energy        %s" % si(total))
+    print("SRAM access energy  %s" % ", ".join(
+        "%s %.1f pJ" % (c, e_access[c] * 1e12) for c in CACHES))
+    if s.get("simInsts") and s.get("system.cpu.numCycles"):
+        cycles = s["system.cpu.numCycles"]
+        print("CPI                 %.2f  (%.1f pJ per cycle)"
+              % (cycles / s["simInsts"], 1e12 * total / cycles))
     print()
 
-    # Carve the L1 access energy out of the lumped dynamic term.
+    # Carve the L1 access energy out of the lumped dynamic term. Priced per
+    # cache, since CACTI gives the two arrays different per-access energies
+    # once they stop being the same size.
     accesses = sum(s.get("%s.overallAccesses" % c, 0.0) for c in CACHES)
-    cache_dyn = accesses * E_SRAM_ACCESS
+    cache_dyn = sum(s.get("%s.overallAccesses" % c, 0.0) * e_access[c]
+                    for c in CACHES)
     dynamic = s.get("dynamicEnergy", 0.0)
     core_logic = dynamic - cache_dyn
     split_ok = accesses > 0 and core_logic > 0
@@ -234,15 +253,36 @@ def report(path):
 
 
 def main():
-    paths = sys.argv[1:]
-    if not paths:
-        paths = ["m5out/stats.txt"]
-    for p in paths:
+    ap = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("paths", nargs="*", default=["m5out/stats.txt"],
+                    help="stats.txt files to report on")
+    ap.add_argument("--e-sram-access", type=float, default=E_SRAM_ACCESS,
+                    help="Per-access energy for both L1s, J (default: "
+                    "%g, Table I). Overridden per cache by the two flags "
+                    "below." % E_SRAM_ACCESS)
+    ap.add_argument("--e-icache-access", type=float, default=None,
+                    help="Per-access energy for the I-cache, J. Defaults to "
+                    "--e-sram-access.")
+    ap.add_argument("--e-dcache-access", type=float, default=None,
+                    help="Per-access energy for the D-cache, J. Defaults to "
+                    "--e-sram-access.")
+    args = ap.parse_args()
+
+    e_access = {
+        "icache": args.e_icache_access
+        if args.e_icache_access is not None else args.e_sram_access,
+        "dcache": args.e_dcache_access
+        if args.e_dcache_access is not None else args.e_sram_access,
+    }
+
+    for p in args.paths:
         if not os.path.isfile(p):
             print("not found: %s" % p)
-    for p in paths:
+    for p in args.paths:
         if os.path.isfile(p):
-            report(p)
+            report(p, e_access)
 
 
 if __name__ == "__main__":

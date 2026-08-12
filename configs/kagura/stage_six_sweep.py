@@ -3,6 +3,11 @@ from m5.objects import *
 import argparse
 import os
 import shlex
+
+# Explicit submodule import: ArmCPU.py is registered with sim_objects=[], so
+# its classes are not guaranteed to come through the star import above.
+from m5.objects.ArmCPU import ArmTimingSimpleCPU
+
 from m5.objects import (
     ACC,
     ACCCache,
@@ -108,6 +113,20 @@ def _parse_args():
         "Kagura's end-of-cycle mode switching on top; 'acc' is the stage 4 "
         "result Kagura must beat; 'bdi' is the compressor always on; 'none' "
         "is the plain uncompressed cache.",
+    )
+
+    core = parser.add_argument_group("core model")
+    core.add_argument(
+        "--cpu-type",
+        choices=["minor", "timing"],
+        default="minor",
+        help="Core model (default: minor, kept so earlier results stay "
+        "reproducible). 'minor' is gem5's four-stage in-order MinorCPU with "
+        "a two-ALU function-unit pool -- an A-class in-order core. 'timing' "
+        "is TimingSimpleCPU: one instruction per cycle plus memory stalls, "
+        "which matches both the paper's description of the core and the "
+        "flat 160 uW/MHz per-cycle power its baseline is priced at. The "
+        "McPAT template should describe whichever of these is selected.",
     )
 
     # Cache geometry
@@ -577,7 +596,24 @@ system.mem_ranges = [AddrRange(MEM_SIZE)]
 system.cache_line_size = args.cacheline
 
 # CPU
-system.cpu = IntermittentMinorCPU()
+#
+# The paper says "single-core in-order five-stage pipeline" and its baseline
+# (NVSRAMCache) prices the core at a flat 160 uW/MHz, i.e. a fixed energy per
+# cycle with no pipeline detail. MinorCPU is a four-stage model whose default
+# function-unit pool is two integer ALUs plus mul/div/FP-SIMD -- an A-class
+# in-order core, not a microcontroller, and the reason the McPAT template came
+# out A9-shaped. TimingSimpleCPU is the closer match: one instruction per
+# cycle plus memory stalls, which is exactly what a flat per-cycle figure
+# describes.
+#
+# TimingSimpleCPU needs no subclass. Its drainResume() only re-activates
+# threads whose status is already Active, so a thread the controller
+# suspended stays suspended -- the one thing IntermittentMinorCPU exists to
+# fix in MinorCPU, which wakes every thread unconditionally.
+if args.cpu_type == "timing":
+    system.cpu = ArmTimingSimpleCPU()
+else:
+    system.cpu = IntermittentMinorCPU()
 
 
 # Split L1 I/D SRAM caches (Table I: 256 B, 2-way, 32 B block, LRU, write-back,
