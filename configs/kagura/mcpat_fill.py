@@ -40,10 +40,33 @@ def get(s, *names):
     return None
 
 
-def build(s):
+def powered_cycles(s, clock_mhz):
+    """Cycles the core was actually powered, not system.cpu.numCycles.
+
+    That counter is only trustworthy on MinorCPU. TimingSimpleCPU picks up
+    the dark periods across a sleep/wake transition, and at a 0.01% duty
+    cycle it overstates by four orders of magnitude -- which McPAT then
+    divides its energy by, so every power figure comes out that much too
+    small. Powered time is measured the same way by both models.
+    """
+    ticks = get(s, "simTicks")
+    secs = get(s, "simSeconds")
+    if not ticks or not secs:
+        return get(s, "system.cpu.numCycles")
+
+    off = 0.0
+    for name, value in s.items():
+        if name.endswith("ticksPoweredOff") and "intermittent" in name:
+            off = value
+            break
+
+    return secs * max(0.0, ticks - off) / ticks * clock_mhz * 1e6
+
+
+def build(s, clock_mhz):
     """gem5 stats -> {component id: {stat name: value}}."""
     insts = get(s, "simInsts")
-    cycles = get(s, "system.cpu.numCycles")
+    cycles = powered_cycles(s, clock_mhz)
     branches = get(s, "system.cpu.executeStats0.numBranches")
     loads = get(s, "system.cpu.executeStats0.numLoadInsts")
     stores = get(s, "system.cpu.executeStats0.numStoreInsts")
@@ -197,17 +220,23 @@ def fill(xml_path, out_path, wanted):
 
 
 def main():
-    if len(sys.argv) != 4:
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    clock_mhz = 200.0
+    for a in sys.argv[1:]:
+        if a.startswith("--clock-mhz="):
+            clock_mhz = float(a.split("=", 1)[1])
+
+    if len(args) != 3:
         print(__doc__)
         return 1
 
-    stats_path, xml_path, out_path = sys.argv[1:4]
+    stats_path, xml_path, out_path = args
     stats = read_stats(stats_path)
     if not stats:
         print("no stats parsed from %s" % stats_path)
         return 1
 
-    wanted = build(stats)
+    wanted = build(stats, clock_mhz)
     written, missing, unmatched = fill(xml_path, out_path, wanted)
 
     for w in written:
