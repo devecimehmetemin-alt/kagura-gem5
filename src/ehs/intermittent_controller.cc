@@ -7,6 +7,7 @@
 #include <iostream>
 #include <sstream>
 #include "cpu/base.hh"
+#include "cpu/thread_context.hh"
 #include "base/logging.hh"
 #include "base/trace.hh"
 #include "debug/IntermittentController.hh"
@@ -404,7 +405,14 @@ namespace gem5
                 "CHECKPOINT     %llu B  E=%.3e J  V=%.4f V\n",
                 bytes, energy, capacitorVoltage);
 
-        cpu->suspendContext(0);
+        // Suspend through the thread context, not cpu->suspendContext().
+        // Only ThreadContext::suspend() sets the thread's status to
+        // Suspended; calling the CPU directly stops execution but leaves the
+        // status reading Active. TimingSimpleCPU::drainResume() tests that
+        // status, so the core would wake itself on the next m5.simulate()
+        // with the capacitor still flat and run on while the model believed
+        // it was dark.
+        cpu->getContext(0)->suspend();
         poweredOffAt = curTick();
         stats.numPowerFailures++;
     }
@@ -412,7 +420,9 @@ namespace gem5
     void
     IntermittentController::thawCpu()
     {
-        cpu->activateContext(0);
+        // Paired with the suspend() in powerOff(): activate() sets the
+        // status back to Active and calls the CPU's activateContext().
+        cpu->getContext(0)->activate();
         stats.numRestores++;
         stats.ticksPoweredOff += curTick() - poweredOffAt;
     }

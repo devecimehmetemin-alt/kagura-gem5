@@ -606,10 +606,11 @@ system.cache_line_size = args.cacheline
 # cycle plus memory stalls, which is exactly what a flat per-cycle figure
 # describes.
 #
-# TimingSimpleCPU needs no subclass. Its drainResume() only re-activates
-# threads whose status is already Active, so a thread the controller
-# suspended stays suspended -- the one thing IntermittentMinorCPU exists to
-# fix in MinorCPU, which wakes every thread unconditionally.
+# TimingSimpleCPU needs no subclass, but it does need the controller to
+# suspend through the thread context rather than calling suspendContext() on
+# the CPU: its drainResume() re-activates any thread whose status is Active,
+# and only ThreadContext::suspend() sets that status. MinorCPU never exposed
+# this because IntermittentMinorCPU ignores thread status entirely.
 if args.cpu_type == "timing":
     system.cpu = ArmTimingSimpleCPU()
 else:
