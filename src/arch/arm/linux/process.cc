@@ -106,6 +106,18 @@ ArmLinuxProcess32::initState()
         0x0e, 0xf0, 0xa0, 0xe1  // return
     };
     proxy.writeBlob(commPage + 0x0fe0, get_tls, sizeof(get_tls));
+
+    // __kuser_helper_version. Without it this word keeps the "swi -1" filler
+    // above, which reads as 0xefffffff -- negative as a signed int. musl
+    // checks the version before using the helpers and calls a_crash() (an
+    // undefined instruction) when it reads below 1, so every musl-linked
+    // binary dies in __set_thread_area before its first syscall.
+    //
+    // 3 is exactly what the helpers above provide: cmpxchg and get_tls are
+    // version 1, memory_barrier is version 3. cmpxchg64 at 0x0f60 would be
+    // version 5 and is not implemented here, so do not claim it.
+    uint8_t kuser_version[] = { 0x03, 0x00, 0x00, 0x00 };
+    proxy.writeBlob(commPage + 0x0ffc, kuser_version, sizeof(kuser_version));
 }
 
 void
