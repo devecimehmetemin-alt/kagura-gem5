@@ -200,14 +200,14 @@ system.cpu.createInterruptController()
 # parameter names (tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW) are gem5 DRAMInterface
 # parameters. NVMInterface has none of them, so the paper modeled ReRAM as
 # a DRAM interface with slowed timings, and this does the same. The read/write
-# asymmetry ReRAM is known for is carried by tCL (15 ns) vs tWR (150 ns).
+# asymmetry ReRAM is known for is carried by tCL (7.5 ns) vs tWR (150 ns).
 class ReRAM(DDR3_1600_8x8):
-    # Table I: tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW = 0.94/7.5/18/15/7.5/150/30 ns
+    # Table I: tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW = 0.94/7.5/18/7.5/15/150/30 ns
     tCK = "0.94ns"
     tBURST = "7.5ns"
     tRCD = "18ns"
-    tCL = "15ns"
-    tWTR = "7.5ns"
+    tCL = "7.5ns"
+    tWTR = "15ns"
     tWR = "150ns"
     tXAW = "30ns"
 
@@ -259,7 +259,7 @@ CKPT_T_PER_BYTE = 150e-9 / 32     # s/byte, from Table I tWR
 # Architectural state a checkpoint has to save
 CKPT_REG_BYTES = 68 + (4 if args.compression == "acc" else 0)
 
-root.intermittent = IntermittentController(cpu=system.cpu, capacitance=1e-6, v_max=3.0,
+root.intermittent = IntermittentController(cpu=system.cpu, capacitance=4.7e-6, v_max=3.0,
                                             v_on=2.4, v_off=1.8, p_harvest=5e-3, harvest_period=10e-3,
                                             duty_cycle=0.5, p_static=0.5e-3 , e_per_inst=80e-12,
                                             ckpt_tags=[system.cpu.dcache.tags],

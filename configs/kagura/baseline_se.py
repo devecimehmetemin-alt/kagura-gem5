@@ -165,7 +165,7 @@ system.cpu.dcache.mem_side = system.membus.cpu_side_ports
 system.cpu.createInterruptController()
 
 # TODO: retune NVM timings to Table I's ReRAM values
-#       (tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW = 0.94/7.5/18.0/15.0/7.5/150/30 ns);
+#       (tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW = 0.94/7.5/18.0/7.5/15.0/150/30 ns);
 #       defaults are used for the Stage 1 sanity check.
 system.mem_ctrl = MemCtrl()
 system.mem_ctrl.dram = NVM_2400_1x64()

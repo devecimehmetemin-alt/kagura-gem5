@@ -179,7 +179,7 @@ CKPT_T_PER_BYTE = 150e-9 / 32     # s/byte, from Table I
 # Registers on a 32 bit ARM
 CKPT_REG_BYTES = 328
 
-root.intermittent = IntermittentController(cpu=system.cpu, capacitance=1e-6, v_max=3.0,
+root.intermittent = IntermittentController(cpu=system.cpu, capacitance=4.7e-6, v_max=3.0,
                                             v_on=2.4, v_off=1.8, p_harvest=5e-3, harvest_period=10e-3,
                                             duty_cycle=0.5, p_static=0.5e-3 , e_per_inst=80e-12,
                                             ckpt_tags=[system.cpu.dcache.tags],

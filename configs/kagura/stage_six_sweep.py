@@ -52,7 +52,7 @@ MEM_SIZE = "16MiB"        # ReRAM main memory
 CACHELINE = 32            # 32 B block size (bytes)
 L1_SIZE = "256B"          # 256 B I-cache and D-cache
 L1_ASSOC = 2              # 2-way
-CAPACITANCE = 1e-6        # 1 uF capacitor
+CAPACITANCE = 4.7e-6      # 4.7 uF energy buffer (Table I)
 
 _THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -675,14 +675,14 @@ system.cpu.createInterruptController()
 # parameter names (tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW) are gem5 DRAMInterface
 # parameters. NVMInterface has none of them, so the paper modeled ReRAM as
 # a DRAM interface with slowed timings, and this does the same. The read/write
-# asymmetry ReRAM is known for is carried by tCL (15 ns) vs tWR (150 ns).
+# asymmetry ReRAM is known for is carried by tCL (7.5 ns) vs tWR (150 ns).
 class ReRAM(DDR3_1600_8x8):
-    # Table I: tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW = 0.94/7.5/18/15/7.5/150/30 ns
+    # Table I: tCK/tBURST/tRCD/tCL/tWTR/tWR/tXAW = 0.94/7.5/18/7.5/15/150/30 ns
     tCK = "0.94ns"
     tBURST = "7.5ns"
     tRCD = "18ns"
-    tCL = "15ns"
-    tWTR = "7.5ns"
+    tCL = "7.5ns"
+    tWTR = "15ns"
     tWR = "150ns"
     tXAW = "30ns"
 
