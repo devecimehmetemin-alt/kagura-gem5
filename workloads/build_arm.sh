@@ -61,8 +61,15 @@ LOG_DIR="/tmp/kagura_armlogs"
 
 # --- sanity check: toolchain present ----------------------------------------
 if ! command -v "$CROSS_GCC" >/dev/null 2>&1; then
-    echo "ERROR: $CROSS_GCC not found."
-    echo "Install it with: sudo apt install -y gcc-arm-linux-gnueabihf"
+    echo "ERROR: $CROSS_GCC not found (LIBC=$LIBC)."
+    if [ "$LIBC" = "musl" ]; then
+        echo "musl cross toolchains are not packaged; fetch one with:"
+        echo "  wget https://musl.cc/arm-linux-musleabi-cross.tgz"
+        echo "  sudo tar -xf arm-linux-musleabi-cross.tgz -C /opt"
+        echo "  export PATH=/opt/arm-linux-musleabi-cross/bin:\$PATH"
+    else
+        echo "Install it with: sudo apt install -y gcc-arm-linux-gnueabi"
+    fi
     exit 1
 fi
 
