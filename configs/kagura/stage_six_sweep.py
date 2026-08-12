@@ -59,6 +59,13 @@ L1_SIZE = "256B"          # 256 B I-cache and D-cache
 L1_ASSOC = 2              # 2-way
 CAPACITANCE = 4.7e-6      # 4.7 uF energy buffer (Table I)
 
+# Capacitor voltage window. Not in Table I, which gives only the capacitance.
+# These are the values stages 2-5 were verified at; the same group's HPCA'25
+# paper uses 3.5/2.8, which delivers 1.75x the energy per power cycle.
+V_MAX = 3.0
+V_ON = 2.4
+V_OFF = 1.8
+
 _THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
 _DEFAULT_BINARY = os.path.normpath(
@@ -317,6 +324,29 @@ def _parse_args():
         help=f"Storage capacitor, in farads (default: {CAPACITANCE}). Sets "
         f"the length of a power cycle, and so the size of the population "
         f"Kagura's N_remain estimate is drawn from.",
+    )
+    pwr.add_argument(
+        "--v-max",
+        type=float,
+        default=V_MAX,
+        help=f"Fully-charged capacitor voltage, V (default: {V_MAX}).",
+    )
+    pwr.add_argument(
+        "--v-on",
+        type=float,
+        default=V_ON,
+        help=f"Voltage the core powers up at, V (default: {V_ON}).",
+    )
+    pwr.add_argument(
+        "--v-off",
+        type=float,
+        default=V_OFF,
+        help=f"Voltage the core powers down at, V (default: {V_OFF}). With "
+        f"--v-on this sets the usable energy per power cycle, "
+        f"0.5*C*(v_on^2 - v_off^2), and so the committed instructions per "
+        f"power cycle that Fig. 14 reports. The paper gives the 4.7 uF but "
+        f"no voltages; the same group's HPCA'25 paper uses 3.5/2.8, which "
+        f"is 1.75x the energy per cycle these defaults deliver.",
     )
     pwr.add_argument(
         "--trace-file",
@@ -824,8 +854,9 @@ if args.ckpt_gate:
                          vector_dump_path=args.vector_dump)
 
 root.intermittent = _CONTROLLER(cpu=system.cpu, capacitance=args.capacitance,
-                                v_max=3.0,
-                                v_on=2.4, v_off=1.8, p_harvest=5e-3, harvest_period=10e-3,
+                                v_max=args.v_max,
+                                v_on=args.v_on, v_off=args.v_off,
+                                p_harvest=5e-3, harvest_period=10e-3,
                                 duty_cycle=0.5,
                                 trace_file=args.trace_file,
                                 trace_scale=args.trace_scale,
