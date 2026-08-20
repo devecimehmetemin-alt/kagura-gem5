@@ -34,6 +34,7 @@ KaguraController::KaguraController(const Params &params)
     percWeights(params.perceptron_history + 1, 0),
     percHistory(params.perceptron_history, 0),
     percY(0),
+    cycleIdx(0),
     kaguraStats(this)
 {
     fatal_if(rThres == 0, "n_thres_init must be nonzero: a zero threshold "
@@ -52,6 +53,15 @@ KaguraController::KaguraController(const Params &params)
              "there is nothing to bound");
     fatal_if(percEnabled && (percHistLen < 1 || percHistLen > 64),
              "perceptron_history must be 1..64");
+
+    if (!params.decision_dump_path.empty()) {
+        decisionDump.open(params.decision_dump_path);
+        decisionDump <<
+            "# per power cycle, state as the cycle ended and before the\n"
+            "# reboot update: the RTL replays R_mem increments against\n"
+            "# R_prev and R_thres, then applies the same AIMD step.\n"
+            "# cycle R_prev R_thres R_mem R_adjust R_evict sat y rm gate\n";
+    }
 }
 
 void
@@ -198,6 +208,18 @@ KaguraController::powerOff()
             "R_evict=%d cnt=%d mode=%s\n",
             rMem, rPrev, rAdjust, rThres, rEvict, satCounter,
             regularMode ? "RM" : "CM");
+
+    // Written here rather than at thawCpu because this is the last point
+    // where R_thres and R_evict still hold the values the cycle actually
+    // decided on: thawCpu overwrites both with the AIMD update.
+    if (decisionDump.is_open()) {
+        decisionDump << cycleIdx << ' ' << rPrev << ' ' << rThres << ' '
+                     << rMem << ' ' << rAdjust << ' ' << rEvict << ' '
+                     << satCounter << ' ' << percY << ' '
+                     << (regularMode ? 1 : 0) << ' '
+                     << (gateBlocked ? 1 : 0) << '\n';
+    }
+    cycleIdx++;
 
     IntermittentController::powerOff();
 }

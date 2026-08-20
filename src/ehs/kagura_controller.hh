@@ -2,6 +2,7 @@
 #define __EHS_KAGURA_CONTROLLER_HH__
 
 #include <cstdint>
+#include <fstream>
 #include <vector>
 
 #include "base/statistics.hh"
@@ -148,6 +149,16 @@ class KaguraController : public IntermittentController
     int percY;
 
     std::vector<ProbeListenerPtr<>> listeners;
+
+    /** Power cycles seen so far, the decision dump's line number. */
+    uint64_t cycleIdx;
+
+    /**
+     * Golden-model dump for the RTL decision unit: one line per power
+     * cycle holding every register the hardware would carry. Nothing from
+     * here reaches the capacitor model.
+     */
+    std::ofstream decisionDump;
 
 
     /** Bunch of statistics kept here, see below for what each is */

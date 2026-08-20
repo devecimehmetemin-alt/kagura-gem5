@@ -264,6 +264,17 @@ def _parse_args():
         "1.93*H + 14)",
     )
     kag.add_argument(
+        "--decision-dump",
+        default="",
+        metavar="PATH",
+        help="Dump the decision unit's registers once per power cycle "
+        "(R_prev, R_thres, R_mem, R_adjust, R_evict, the 2-bit counter, "
+        "the perceptron sum, and whether the cycle entered Regular Mode or "
+        "was vetoed). This is the golden model an RTL decision unit is "
+        "checked against, and the stimulus that drives its switching "
+        "activity for power analysis. Kagura only.",
+    )
+    kag.add_argument(
         "--perc-volatile",
         action="store_true",
         help="Zero the perceptron at each reboot: models the weights "
@@ -588,6 +599,11 @@ if args.rm_confidence and args.compression != "kagura":
              f"'{args.compression}'")
 if not 0 <= args.rm_confidence <= 3:
     m5.fatal("--rm-confidence compares against a 2-bit counter (0..3)")
+if args.decision_dump and args.compression != "kagura":
+    m5.fatal("--decision-dump reads the Kagura decision unit's registers, "
+             "but --compression is '%s', which has no such unit."
+             % args.compression)
+
 if args.rm_perceptron and args.compression != "kagura":
     m5.fatal("--rm-perceptron is a Kagura knob, but --compression is "
              f"'{args.compression}'")
@@ -832,6 +848,7 @@ _KAGURA_PARAMS = (
         perceptron_history=args.perc_history,
         perceptron_theta=args.perc_theta,
         perceptron_volatile=args.perc_volatile,
+        decision_dump_path=args.decision_dump,
     )
     if args.compression == "kagura"
     else {}

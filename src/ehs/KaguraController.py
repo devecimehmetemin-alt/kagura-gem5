@@ -49,3 +49,11 @@ class KaguraController(IntermittentController):
 
     perceptron_theta = Param.Int(0,
         "Training threshold; 0 = Jimenez fitted value 1.93*H + 14")
+
+    # Overhead measurement: one line per power cycle carrying every register
+    # the decision unit holds. An RTL testbench replays these to check its
+    # own state transitions against gem5, and the resulting switching
+    # activity is what prices the logic in pJ per decision.
+    decision_dump_path = Param.String("",
+        "Path to dump per-power-cycle decision-unit state for RTL "
+        "verification and power analysis (empty: no dump)")
