@@ -218,6 +218,10 @@ KaguraController::powerOff()
                      << satCounter << ' ' << percY << ' '
                      << (regularMode ? 1 : 0) << ' '
                      << (gateBlocked ? 1 : 0) << '\n';
+        // gem5 exits without destructing SimObjects, so an
+        // unflushed tail never reaches disk: at ~38 B a cycle the
+        // last 8 KB buffer's worth of power cycles would vanish.
+        decisionDump.flush();
     }
     cycleIdx++;
 
